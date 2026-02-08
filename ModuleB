@@ -1,0 +1,665 @@
+Module 1 ->
+
+
+Module 2 -> -> -> ->
+**RTR-COD**
+en
+	conf
+		hostname rtr-cod.cod.ssa2026.region;exec bash
+		int int 0
+			178.207.179.4/28
+			ip nat out
+			int int1
+			ip add 192.168.32.201/30
+			ip nat ins
+			port te0
+			service-instance int0/te0
+				enc unt
+				conn ip int int0
+				port te1
+			service-instance int1/te1
+				enc unt 
+				conn ip int int1
+				end
+	wr
+	conf
+		router bgp 64500
+			bgp router-id 178.207.179.4
+			neig 178.207.179.1 remote-as 31133
+			ex
+		int tunnel.0
+			ip add 10.10.10.1/30
+			ip mtu 1476
+			ip tun 178.207.179.4 178.179.207.28 mode gre
+			ex
+		ip nat pool cod 192.168.32.1-192.168.32.254
+		ip nat source dy so cod overload int int0
+		end
+	wr
+	conf
+		router ospf 1
+			router id 10.10.10.1
+			passive-int default
+			no passive-int tunnel.0
+			net 10.10.10.0/30 area 0
+			net 192.168.32.200/30 area 0
+			ex
+		int tunnel.0
+			ip ospf authentication message-diggest
+			ip ospf message-digest-key 1 md5 P@ssw0rd
+			end
+	wr
+	conf
+
+**RTR-A**
+en
+	conf
+		hostname rtrt-a
+		ip domain-name office.ssa2026.region
+		int int0
+			ip nat out 
+			ip add 178.207.179.28/28
+			int int1
+			ip nat ins
+			ip add 192.168.44.1/29
+			int int2
+			ip nat ins
+			ip add 192.168.42.9/29
+			ip nat ins
+			ip add 192.168.43.17/29
+			port te0
+			service-ins int0/te0
+				enc unt
+				conn ip int int0
+				port te1
+			service-ins int1/te1
+				enc dot 100 exa
+				rew pop 1
+				conn ip int int1
+				ex
+			service-ins int2/te1
+				enc dot 200 exa
+				rew pop 1
+				conn ip int int2
+				ex
+			service-ins 3
+				enc dot 300 exa
+				rew pop 1
+				conn ip int int3
+				end
+	conf
+		ip nat pool office 192.168.44.1-192.168.44.254
+		ip nat souce dynamic inside--- pool vl100 overload int int0
+		ip route 0.0.0.0/0 178.207.179.25
+		int tunnel.0
+			ip add 10.10.10.2/30
+			ip mtu 1476
+			ip tun 178.207.179.28 178.207.179.4 mode gre
+			ex
+		router ospf 1
+			ospf router-id 10.10.10.2
+			passive-int default
+			net 10.10.10.0/30 area 0
+			net 192.168.44.0 0.0.0.3 area 0
+			net 192.168.42.8 0.0.0.3 area 0
+			net 192.168.43.16 0.0.0.3 area 0
+			no passive-int tunnel.0
+			ex
+		int tunnel.0
+			ip ospf auth message-digest
+			ospf message-digest-key 1 md5 P@ssw0rd
+			end
+	wr
+
+**SW1-A**
+systemctl enable --now openvswitch
+hostnamectl set-hostname sw1-a.office.ssa2026.region;exec bash
+cd /etc/net/ifaces
+mkdir enp7s{2,3,4}
+vim enp7s1/options
+	`TYPE=eth`
+	`BOOTPROTO=static`
+cp enp7s1/options enp7s2/options
+cp enp7s1/options enp7s4/options
+cp enp7s1/options enp7s4/options
+vim default/options
+	`OVS_REMOVE=no`
+systemctl restart network
+mkdir mgmt
+cd mgmt
+vim options
+	`TYPE=ovsport`
+	`BOOTPROTO=static`
+	`CONFIG_IPV4=yes`
+	`VID=300`
+	`BRIDGE=sw1-a`
+ovs-vsctl add-br sw1-a
+echo 192.168.44.17/24 > ipv4address
+echo default via 192.168.44.16 > ipv4route
+systemctl restart network
+ovs-vsctl add-port sw1-a enp7s1 trunk=100,200,300
+ovs-vsctl add-port sw1-a enp7s2 trunk=100,200,300
+ovs-vsctl add-port sw1-a enp7s3 trunk=100,200,300
+ovs-vsctl add-port sw1-a enp7s4 tag=100
+modprobe 8021q
+ovs-vsctl set-bridge sw1-a rstp_enable=true
+ovs-vsctl set bridge sw1-a other_config:stp-protocol=rstp
+ovs-vsctl set bridge sw1-a other_config:stp-priority=0
+ovs-appctl stp/show
+ovs-vsctl set port mgmt vlan_mode=native-untagged
+
+**SW2-A**
+systemctl enable --now openvswitch
+hostnamectl set-hostname sw2-a.office.ssa2026.region;exec bash
+cd /etc/net/ifaces
+mkdir enp7s{2,3,4}
+vim enp7s1/options
+	`TYPE=eth`
+	`BOOTPROTO=static`
+cp enp7s1/options enp7s2/options
+cp enp7s1/options enp7s4/options
+cp enp7s1/options enp7s4/options
+vim default/options
+	`OVS_REMOVE=no`
+systemctl restart network
+mkdir mgmt
+cd mgmt
+vim options
+	`TYPE=ovsport`
+	`BOOTPROTO=static`
+	`CONFIG_IPV4=yes`
+	`VID=300`
+	`BRIDGE=sw2-a`
+ovs-vsctl add-br sw2-a
+echo 192.168.44.18/24 > ipv4address
+echo default via 192.168.44.17 > ipv4route
+systemctl restart network
+ovs-vsctl add-port sw2-a enp7s1 trunk=100,200,300
+ovs-vsctl add-port sw2-a enp7s2 trunk=100,200,300
+ovs-vsctl add-port sw2-a enp7s3 tag=200
+ovs-vsctl add-port sw2-a enp7s4 tag=200
+modprobe 8021q
+ovs-vsctl set-bridge sw1-a rstp_enable=true
+ovs-vsctl set bridge sw1-a other_config:stp-protocol=rstp
+ovs-appctl stp/show
+ovs-vsctl set port mgmt vlan_mode=native-untagged
+
+**SW1-COD**
+systemctl enable --now openvswitch
+hostnamectl set-hostname sw1-cod.cod.ssa2026.region;exec bash
+cd /etc/net/ifaces
+mkdir enp7s{2,3,4,5,6}
+vim enp7s1/options
+	`TYPE=eth`
+	`BOOTPROTO=static`
+cp enp7s1/options enp7s2/options
+cp enp7s1/options enp7s4/options
+cp enp7s1/options enp7s4/options
+cp enp7s1/options enp7s5/options
+cp enp7s1/options enp7s6/options
+vim default/options
+	`OVS_REMOVE=no`
+systemctl restart network
+mkdir mgmt
+cd mgmt
+vim options
+	`TYPE=ovsport`
+	`BOOTPROTO=static`
+	`CONFIG_IPV4=yes`
+	`VID=300`
+	`BRIDGE=sw1-cod`
+echo 192.168.32.18/24 > ipv4address
+echo default via 192.168.32.17 > ipv4route
+ovs-vsctl add-br sw1-cod
+systemctl restart network
+ovs-vsctl add-port sw1-cod enp7s1 trunk=100,200,300,400,500
+ovs-vsctl add-bond sw1-cod bond0 enp7s2 enp7s3 bond_mode=active-backup
+ovs-vsctl set port bond0 trunk=100,200,300,400,500
+ovs-vsctl add-port sw1-cod enp7s4 tag=100
+ovs-vsctl add-port sw1-cod enp7s5 tag=200
+ovs-vsctl add-port sw1-cod enp7s6 tag=400
+modprobe 8021q
+ovs-vsctl set-port mgmt vlan_mode=native-untagged
+
+**SW2-COD**
+systemctl enable --now openvswitch
+hostnamectl set-hostname sw2-cod.cod.ssa2026.region;exec bash
+cd /etc/net/ifaces
+mkdir enp7s{2,3,4,5,6}
+vim enp7s1/options
+	`TYPE=eth`
+	`BOOTPROTO=static`
+cp enp7s1/options enp7s2/options
+cp enp7s1/options enp7s4/options
+cp enp7s1/options enp7s4/options
+cp enp7s1/options enp7s5/options
+cp enp7s1/options enp7s6/options
+vim default/options
+	`OVS_REMOVE=no`
+systemctl restart network
+mkdir mgmt
+cd mgmt
+vim options
+	`TYPE=ovsport`
+	`BOOTPROTO=static`
+	`CONFIG_IPV4=yes`
+	`VID=300`
+	`BRIDGE=sw2-cod`
+echo 192.168.32.17/24 > ipv4address
+echo default via 192.168.32.19 > ipv4route
+ovs-vsctl add-br sw2-cod
+systemctl restart network
+ovs-vsctl add-bond sw2-cod bond0 enp7s1 enp7s2 bond_mode=active-backup
+ovs-vsctl set port bond0 trunk=100,200,300,400,500
+ovs-vsctl add-port sw2-cod enp7s3 tag=400
+ovs-vsctl add-port sw2-cod enp7s4 tag=500
+ovs-vsctl add-port sw2-cod enp7s5 tag=100
+ovs-vsctl add-port sw2-cod enp7s6 tag=200
+modprobe 8021q
+ovs-vsctl set port mgmt vlan_mode=native-untagged
+
+**ADMIN-COD**
+hostnamectl admin-cod.cod.ssa2026.region;exec bash
+cd /etc/net/ifaces/enp7s1
+rm -rf options
+vim options
+	TYPE=eth
+	BOOTPROTO=static
+	CONFIG_IPV4=yes
+echo 192.168.32.20/24 > ipv4address
+echo default via 192.168.32.17
+echo nameserver 8.8.8.8 > /etc/resolv.conf
+systemctl restart network
+reboot
+
+**ADMIN-COD (IDECO)**
+	![[Pasted image 20260128230531.png]]
+	![[Pasted image 20260128232328.png]]
+	![[Pasted image 20260128232339.png]]
+	![[Pasted image 20260128232347.png]]
+vtysh /etc/frr/frr.conf
+	![[Pasted image 20260128232508.png]]
+systemctl restart frr
+
+**SRV1-COD**
+hostnamectl set-hostname srv1-cod.cod.ssa2026.region;exec bash
+cd /etc/net/ifaces
+vim enp7s1/options
+	TYPE=eth
+	BOOTPROTO=static
+echo 192.168.32.2/24 > enp7s1/ipv4address
+echo 192.168.32.1 > enp7s1/ipv4route
+mkdir enp7s2
+cp enp7s1/options enp7s2/options
+echo 192.168.33.2/24 > enp7s2/ipv4address
+echo nameserver 8.8.8.8 > /etc/resolv.conf
+systemctl restart network
+
+**SRV2-COD**
+hostnamectl set-hostname srv2-cod.cod.ssa2026.region;exec bash
+cd /etc/net/ifaces
+vim enp7s1/options
+	TYPE=eth
+	BOOTPROTO=static
+echo 192.168.32.3/24 > enp7s1/ipv4address
+echo 192.168.32.1 > enp7s1/ipv4route
+mkdir enp7s2
+cp enp7s1/options enp7s2/options
+echo 192.168.33.3/24 > enp7s2/ipv4address
+echo nameserver 8.8.8.8 > /etc/resolv.conf
+systemctl restart network
+
+**DC-A**
+hostnamectl set-hostname dc-a.office.ssa2026.region
+cd /etc/net/ifaces/enp7s1
+rm -rf options
+vim options
+	TYPE=eth
+	BOOTPROTO=static
+echo 192.168.44.2/24 > ipv4address
+echo default via 192.168.44.1 > ipv4route
+echo nameserver 8.8.8.8 > /etc/resolv.conf
+systemctl restart network
+
+**CLI1-A**
+hostnamectl set-hostname cli1-a.office.ssa2026.region;exec bash
+cd /etc/net/ifaces/enp7s1
+rm -rf options
+vim options
+	TYPE=eth
+	BOOTPROTO=static
+echo 192.168.44.10/24 > ipv4address
+echo default via 192.168.42.9 > ipv4route
+echo nameserver 8.8.8.8 > /etc/resolv.conf
+systemctl restart network
+
+**CLI2-A**
+hostnamectl set-hostname cli2-a.office.ssa2026.region;exec bash
+cd /etc/net/ifaces/enp7s1
+rm -rf options
+vim options
+	TYPE=eth
+	BOOTPROTO=static
+echo 192.168.44.11/24 > ipv4address
+echo default via 192.168.44.9 > ipv4route
+echo nameserver 8.8.8.8 > /etc/resolv.conf
+systemctl restart network
+
+**CLI-COD**
+hostnamectl set-hostname cli-cod.cod.ssa2026.region;exec bash
+cd /etc/net/ifaces/enp7s1
+rm -rf options
+vim options
+	TYPE=eth
+	BOOTPROTO=static
+echo 192.168.32.26/29 > ipv4address
+echo default via 192.168.32.25 > ipv4route
+echo nameserver 8.8.8.8 > /etc/resolv.conf
+systemctl restart network
+
+**SRV1-COD**
+apt-get update && apt-get install freeradius freeradius-utils -y
+systemctl enable --now radiusd
+vim /etc/raddb/clients.conf
+		clients ALL {
+			ipaddr = 0.0.0.0
+			netmask = 0
+			secret = P@ssw0rd
+		}
+		![[Pasted image 20260129154900.png]]
+vim /etc/raddb/users
+	netuser Cleartext-Password := "Pssw0rd"
+		Service-Type = Administrative-User,
+		Cisco-AVPair = "shell:roles=admin"
+		![[Pasted image 20260129153338.png]]
+systemctl restart radiusd
+
+**RTR-COD**
+en
+	conf
+		security none
+		aaa radius-server 192.168.32.2 port 1812 secret P@ssw0rd auth
+		aaa precedence local radius
+		end
+	wr
+
+**SW-COD**
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+apt-get update && apt-get install pam_radius -y
+vim /etc/pam_radius_auth_conf
+	192.168.1.2 P@ssw0rd 3
+	![[Pasted image 20260129155250.png]]
+vim /etc/pam.d/sshd
+	auth sufficient pam_radius_auth.so
+	![[Pasted image 20260129155356.png]]
+vim /etc/pam.d/system-auth-local
+	auth sufficient pam_radius_auth.so
+useradd netuser
+passwd netuser 
+systemctl restart sshd
+
+**RTR**
+en
+	conf
+		ntp timezone utc+3
+		ntp server 100.100.100.100
+**ALT**
+timedatectl set-timezone Asia/Yekaterinburg
+vim /etc/chrony.conf
+	pool 100.100.100.100 iburst
+systemctl restart chronyd
+(chronyc tracking)
+
+**ADMIN-COD (IDECO)**
+Сервисы - NTP - 100.100.100.100
+
+**SRV1-COD**
+apt-get update && apt-get install bind bind-utils -y
+cd /etc/bind
+vim options.conf
+	listen-on { any; };
+	forwarders { 100.100.100.100; };
+	allow-querry { 0.0.0.0/0; };
+	allow-transfer { 192.168.41.2; };
+vim rfc1912.local
+	`zone "cod.ssa2026.region" {`
+		`type master;`
+		`file "cod.ssa2026.region";`
+		`allow-transfer { 192.168.41.2; };`
+	`};`
+	`zone "3.in-addr.arpa." {`
+		`type master;`
+		`file "cod.ssa2026.region";`
+		`allow-transfer { 192.168.41.2; };`
+	`};`
+	`zone "office.ssa2026.region" {`
+		`type forward;`
+		`forward only;`
+		`forwarders { 192.168.41.2; };`
+	`};`
+	`zone "4.in-addr.arpa" {`
+		`type forward;`
+		`forward only;`
+		`forwarders { 192.168.41.2; };`
+	`};`
+cp localhost cod.ssa2026.region
+chown root:named cod.ssa2026.region
+	![[Pasted image 20260201113048.png]]
+	![[Pasted image 20260201113059.png]]
+vim  /etc/net/ifaces/enp7s1/resolv.conf
+	search cod.ssa2026.region
+	nameserver 127.0.0.1
+systemctl restart network
+systemctl restart bind
+
+**DC-A**
+control bind-chroot disabled
+echo 'KRB5RCACHETYPE="none"' >> /etc/sysconfig/bind
+echo 'include "/var/lib/samba/bind-dns/named.conf";' >> /etc/bind/named.conf
+rm -rf /etc/samba/smb.conf
+rm -rf /var/cache/samba
+mkdir -p /var/lib/samba/sysvol
+samba-tool domain provision
+systemctl enable --now samba
+systemctl enable --now bind
+cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
+systemctl restart samba
+samba-tool dns add 127.0.0.1 office.ssa2026.region rtr-a A 192.168.44.1 -U Administrator
+samba-tool dns add 127.0.0.1 office.ssa2026.region rtr-a A 192.168.44.9 -U Administrator
+samba-tool dns add 127.0.0.1 office.ssa2026.region rtr-a A 192.168.44.7 -U Administrator
+samba-tool dns add 127.0.0.1 office.ssa2026.region sw1-a A 192.168.44.18 -U Administrator
+samba-tool dns add 127.0.0.1 office.ssa2026.region sw2-a A 192.168.44.19 -U Administrator
+samba-tool dns add 127.0.0.1 office.ssa2026.region cli1-a A 192.168.42.10 -U Administrator
+samba-tool dns add 127.0.0.1 office.ssa2026.region cli2-a A 192.168.42.11 -U Administrator
+cd /etc/bind
+vim local.conf
+	![[Pasted image 20260129185050.png]]
+	![[Pasted image 20260201113243.png]]
+	![[Pasted image 20260201113303.png]]
+vim /etc/net/ifaces/enp7s1/resolv.conf
+	search office.ssa2026.region
+	nameserver 127.0.0.1
+systemctl restart network
+systemctl restart bind
+systemctl restart samba
+
+
+**CLI1-A**
+apt-get update && apt-get install task-auth-ad-sssd admc gpui gpupdate -y
+	![[Pasted image 20260201120320.png]]
+	![[Pasted image 20260201131049.png]]
+	![[Pasted image 20260201132322.png]]
+	
+
+
+**SRV1-COD**
+mkdir /var/ca
+vim /etc/openssl/openssl.cnf
+	dir = /var/ca
+	policy = policy_anything
+cd /var/ca
+mkdir certs
+mkdir crl
+mkdir newcerts
+mkdir private
+touch index.txt
+touch serial
+touch crlnumber
+echo 01 > serial
+echo 01> crlnumber
+openssl genrsa -out private/cakey.pem
+openssl req -new -key private /cakey.pem -out cacert.csr
+(company: IRPO  
+Common name: ssa2026)
+openssl x509 -req -days 1825 -in cacert.csr -signkey private/cakey.pem -out cacert.pem
+
+![[Pasted image 20260206214922.png]]
+
+**CLI-COD/ADMIN-COD/CLI1-A/CLI2-A**
+scp root@srv1-cod.cod.ssa2026.region:/var/ca/cacert.pem /etc/pki/ca-trust/source/anchors/ca.crt
+update-ca-trust
+
+**SRV1-COD**
+openssl genrsa -out necerts/monitoring.key
+openssl req -new -key newcerts/monitoring.key -out newcerts/monitoring.csr
+
+
+**SRV2-COD**
+apt-get update && apt-get install postgresql17-server -y
+/etc/init.d/postgresql initdb
+systemctl enable --now postgresql
+vim /var/lib/pgsql/data/postgresql.conf
+	listen_address = ' * 
+	![[Pasted image 20260201221203.png]]
+vim /var/lib/pgsql/data/pg_hba.conf
+	host all all 0.0.0.0/0
+	![[Pasted image 20260201221305.png]]
+systemctl restart postgresql 
+createuser -U postgres --superuser --encrypted --pwprompt superadmin
+su - postgres -s /bin/sh -c 'createdb -O superadmin superadmin'
+
+**ADMIN-COD**
+apt-get update && apt-get install eepm -y
+emp play -y dbeaver 
+	![[Pasted image 20260201222849.png]]
+	![[Pasted image 20260201222928.png]]
+
+**SRV2-COD**
+apt-get update && apt-get install iscitarget-utils
+systemctl enable --now tgt
+vim /etc/tgt/targets.conf
+	![[Pasted image 20260201225552.png]]
+systemctl restart tgt
+vim /etc/lvm/lvm.conf
+	![[Pasted image 20260201230526.png]]
+
+**SRV1-COD**
+apt-get update && apt-get install open-iscsi -y
+systemctl enable --now iscsid
+iscsiadm -m discovery -p 192.168.32.10 -t st 
+vim /etc/iscsi/iscsid.conf
+	![[Pasted image 20260206195140.png]]
+vim /var/lib/iscsi/nodes/qn.2026-(Дальше по ТАБУ)
+	![[Pasted image 20260206200639.png]]
+reboot
+	![[Pasted image 20260206201803.png]]
+pvcreate /dev/sdb
+vgcreate VG /dev/sdb
+lvcreate -l 100%FREE -n DATA VG
+mkfs.xfs /dev/VG/DATA
+mkdir /opt/data
+vim /etc/fstab
+	/dev/VG/DATA /opt/data xfs defaults, netdev 0 0
+	![[Pasted image 20260206202204.png]]
+mount -av
+apt-get install nfs-server nfs-utils -y
+chmod 777 /opt/data
+vim /etc/exports
+	/opt/data 192.168.32.0/24(rw,no_root_squash)
+exportfs -arv
+systemctl enable --now nfs-server
+
+**ADMIN-COD**
+apt-get update && apt-get install nfs-utils nfs-client -y
+mkdir /mnt/nfs
+chmod 777 /mnt/nfs
+vim /etc/fstab
+	192.168.32.2:/opt/data /mnt/nfs nfs defaults, netdev 0 0
+mount -av
+df -h
+
+
+**SRV2-COD**
+apt-get update && apt-get install zabbix-server-pgsql -y
+su - postgres -s /bin/sh -c 'createuser --no-superuser --no-createdb --no-createrol --encrypted --pwprompt zabbix_user'
+su - postgres -s /bin/sh -c 'createdb -O zabbix_user zabbix'
+systemctl restart postgresql
+su - postgres -s /bin/sh -c 'psql -U zabbix_user -f /usr/share/doc/zabbix-common-database-pgsql-* /schema.sql zabbix
+su - postgres -s /bin/sh -c 'psql -U zabbix_user -f /usr/share/doc/zabbix-common-database-pgsql-* /images.sql zabbix
+su - postgres -s /bin/sh -c 'psql -U zabbix_user -f /usr/share/doc/zabbix-common-database-pgsql-* /data.sql zabbix
+
+**SRV1-COD**
+apt-get update && apt-get install apache2 apache2-mod_{php8.2,ssl} -y
+systemctl enable --now httpd2
+apt-get install php8.2 php8.2-{mbstring,sockets,gd,xmlreader,pgsql,openssl} -y
+vim /etc/php/8.2/apache2-mod_php/php.ini
+	max_execution_tme = 600
+	max_input_time = 600
+	memory_limit = 256M
+	data.timezone = Asia/Yekaterinburg
+	always_populate_raw_post_data = -1
+systemctl restart httpd2
+apt-get install zabbix-server-pgsql -y
+vim /etc/zabbix/zabbix_server.conf
+	DBHost=192.168.32.2
+	DBName=zabbix
+	DBUser=zabbix_user
+	DBPassword=P@ssw0rdZabbix
+systemctl enable --now zabbix_pgsql
+apt-get install zabbix-phpfrontend-{apache2,php8.2} -y
+vim /etc/httpd/conf/sites-available/zabbix.conf
+	![[Pasted image 20260206221812.png]]
+cp /var/ca/newcerts/monitoring.crt /var/lib/ssl/certs/
+cp /var/ca/newcerts/monitoring.key /var/lib/ssl/private/
+ln -s /etc/httpd/conf/sited-available/zabbix.conf /etc/httpd/conf/sites-enabled/
+a2enmod ssl; a2enmod rewrite; a2enport https
+apachectl -t
+chow -R apache2:apache2 /var/www/webapps/zabbix
+systemctl restart httpd2
+
+**ADMIN-COD**
+https://srv1-cod.cod.ssa2026.region
+![[Pasted image 20260206225820.png]]
+![[Pasted image 20260206225848.png]]
+![[Pasted image 20260206230002.png]]
+![[Pasted image 20260206230127.png]]
+Admin - zabbix
+Users-Authentication
+![[Pasted image 20260206230232.png]]
+
+**srv1-cod, srv2-cod, dc-a, sw1-cod, sw2-cod, sw1-a, sw2-a**
+apt-get install zabbix-agent -y
+vim /etc/zabbix/zabbix_agentd.conf
+	Server=192.168.32.2
+	ServerActive=192.168.32.2
+	Hostname=srv1-cod.cod.ssa2026.region (каждому устройству свой хостнейм)
+systemctl enable --now zabbix_agentd
+
+**Веб.интерфейс**
+Мониторинг-zabbix-агент-Прием запросов от Zabbix
+	![[Pasted image 20260206233329.png]]
+
+**RTR**
+en
+	conf
+		snmp-server enable snmp
+		snmp-server community public ro
+		end
+	wr
+
+**ADMIN-COD**
+Monitoring -> Hosts ->Create host
+	![[Pasted image 20260206234620.png]]
+	![[Pasted image 20260206235750.png]]
+
+
