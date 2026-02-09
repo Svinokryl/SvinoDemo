@@ -1,0 +1,55 @@
+1) Проверяем хостнеймы через hostnamectl и скрини каждое устройство+ смотрим на  маски.
+У BR-SRV, CLI - 28
+999 - 29
+HQ-SRV - 27
+
+2) Проверить работает ли DHCP (должен быть правильный домен, он неправильный)
+vim /etc/dhcp/dhcpd.conf
+
+3) Проверить PAT (nft list ruleset)
+HQ - да.
+BR - нет. ни одно устройство не подходит
+
+4) Туннельное соединение между офисами: DA
+nmcli connection show
+nmcli connection show gre-tun
+ip addr show gre-tun
+
+5) OSPF -нет.
+vim /etc/frr/frr.conf
+Нет пассивного интерфейса на hq-rtr
+Да - аутенфикация 
+
+6) DNS установлен и работает: да
+Нет PTR записей 
+7)У роутеро есть инет
+
+8) ПРОВЕРКА ssh без пароля:
+sudo -l -u sshuser
+9) настройка ssh - нет
+MaxAuthTries 1, надо поставить 2
+
+10) NTP не настроен
+
+11) AD на CLI - da
+12) Пользователи на CLI - да. samba-tool user list | grep user
+samba-tool group listmembers hq
+13) Samba - да
+
+14) 	Разрешено выполнение команд для пользователей на HQ-CLI в соответствии с заданием - нет. Без su /cat/grep/id не работает. Проблема с настройками
+
+15)Контейнеры докера неправильно настроены (/opt/site/site.yml)
+
+16) Инвентарь энсибл работает - да. скорее всего тоже в opt
+
+17) пинги энсибл - да
+
+18) systemctl status nginx - da
+19) ls /etc/nginx/sites-enabled - net
+20) Проброс - только у докера
+21) Проксирование - да:
+curl -I http://docker.au-team.irpo
+curl -I http://web.au-team.irpo
+22) Рейд - нет. Стоит рейд0, нужен 1
+lbslk
+23) нет запими для nfs в /etc/fstab
