@@ -483,9 +483,14 @@ systemctl restart samba
 
 **CLI1-A**
 apt-get update && apt-get install task-auth-ad-sssd admc gpui gpupdate -y
-	![[Pasted image 20260201120320.png]]
-	![[Pasted image 20260201131049.png]]
-	![[Pasted image 20260201132322.png]]
+kinit administrator@OFFICE.SSA2026.REGION
+admc
+Computers -> создать поздраделения ofadmins ofusers + внутри группы + добавить ofadmin1/ofuser1/user1 
+Объекты групповой полтики -Ю сощдать политику и связать - my-gpo.
+Компьютер - Административные шаблоны - АЛЬТ - Гном - Внешний вид -фон -включено, файл по типу: file:///home/user/Изображение/file.png
+АЛЬТ - Polkit -NetworkManager - поставить везде ограничения
+ребут
+
 	
 
 
