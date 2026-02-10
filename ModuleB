@@ -362,16 +362,13 @@ apt-get update && apt-get install freeradius freeradius-utils -y
 systemctl enable --now radiusd
 vim /etc/raddb/clients.conf
 		clients ALL {
-			ipaddr = 0.0.0.0
-			netmask = 0
+			ipaddr = 0.0.0.0/0
 			secret = P@ssw0rd
 		}
 		![[Pasted image 20260129154900.png]]
 vim /etc/raddb/users
 	netuser Cleartext-Password := "Pssw0rd"
-		Service-Type = Administrative-User,
 		Cisco-AVPair = "shell:roles=admin"
-		![[Pasted image 20260129153338.png]]
 systemctl restart radiusd
 
 **RTR-COD**
