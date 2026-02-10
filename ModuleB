@@ -493,6 +493,7 @@ apt-get update && apt-get install task-auth-ad-sssd admc gpui gpupdate -y
 
 
 **SRV1-COD**
+(загуглить openssl openvpn alt и будет настройка в командной строке)
 mkdir /var/ca
 vim /etc/openssl/openssl.cnf
 	dir = /var/ca
@@ -508,7 +509,7 @@ touch crlnumber
 echo 01 > serial
 echo 01> crlnumber
 openssl genrsa -out private/cakey.pem
-openssl req -new -key private /cakey.pem -out cacert.csr
+openssl req -new -key private/cakey.pem -out cacert.csr
 (company: IRPO  
 Common name: ssa2026)
 openssl x509 -req -days 1825 -in cacert.csr -signkey private/cakey.pem -out cacert.pem
@@ -521,19 +522,27 @@ update-ca-trust
 
 **SRV1-COD**
 openssl genrsa -out necerts/monitoring.key
-openssl req -new -key newcerts/monitoring.key -out newcerts/monitoring.csr
-
+openssl req -new -key newcerts/monitoring.key -out newcerts/monitoring.csr	
+cat <<EOF > monitoring.ext
+  authorityKeyIdentifier=keyid,issuer
+  basicConstraints=CA:FALSE
+  subjectAltName=@alt_names
+  [alt_names]
+  DNS.1=srv1-cod.cod.ssa2026.region
+  DNS.2=monitoring.cod.ssa2026.region
+  IP.1=192.168.32.2
+EOF
+penssl x509 -req -CA cacert.pem -CAkey private/cakey.pem -in newcerts/monitoring.csr -out newcerts/monitoring.crt -days 365 -CAcreateserial -extfile monitoring.ext
 
 **SRV2-COD**
 apt-get update && apt-get install postgresql17-server -y
 /etc/init.d/postgresql initdb
 systemctl enable --now postgresql
 vim /var/lib/pgsql/data/postgresql.conf
-	listen_address = ' * 
-	![[Pasted image 20260201221203.png]]
+	listen_address = '*'
 vim /var/lib/pgsql/data/pg_hba.conf
-	host all all 0.0.0.0/0
-	![[Pasted image 20260201221305.png]]
+Ipv4 local connections:
+	host all all 0.0.0.0/0 md5
 systemctl restart postgresql 
 createuser -U postgres --superuser --encrypted --pwprompt superadmin
 su - postgres -s /bin/sh -c 'createdb -O superadmin superadmin'
@@ -541,36 +550,37 @@ su - postgres -s /bin/sh -c 'createdb -O superadmin superadmin'
 **ADMIN-COD**
 apt-get update && apt-get install eepm -y
 emp play -y dbeaver 
-	![[Pasted image 20260201222849.png]]
-	![[Pasted image 20260201222928.png]]
+Запуск dbeaver -> connect to database -> Postgresql -> Host: srv2-cod.cod.ssa2026.region Database: superadmin Username: superadmin P@ssw0rdSQL
+
 
 **SRV2-COD**
 apt-get update && apt-get install iscitarget-utils
 systemctl enable --now tgt
 vim /etc/tgt/targets.conf
-	![[Pasted image 20260201225552.png]]
+<target iqn.2026-11.region.ssa2026.cod:data.target>
+	direct-store /dev/sdb
+</target>
 systemctl restart tgt
-vim /etc/lvm/lvm.conf
-	![[Pasted image 20260201230526.png]]
+	
 
 **SRV1-COD**
 apt-get update && apt-get install open-iscsi -y
 systemctl enable --now iscsid
-iscsiadm -m discovery -p 192.168.32.10 -t st 
+iscsiadm -m discovery -p 192.168.32.11 -t st 
 vim /etc/iscsi/iscsid.conf
-	![[Pasted image 20260206195140.png]]
+	node.startup = automatic
+	#node.startup = manual
 vim /var/lib/iscsi/nodes/qn.2026-(Дальше по ТАБУ)
-	![[Pasted image 20260206200639.png]]
+	node.startup = automatic
 reboot
-	![[Pasted image 20260206201803.png]]
+	fdisk -l
 pvcreate /dev/sdb
 vgcreate VG /dev/sdb
 lvcreate -l 100%FREE -n DATA VG
 mkfs.xfs /dev/VG/DATA
 mkdir /opt/data
 vim /etc/fstab
-	/dev/VG/DATA /opt/data xfs defaults, netdev 0 0
-	![[Pasted image 20260206202204.png]]
+	/dev/VG/DATA /opt/data xfs defaults,_netdev 0 0
 mount -av
 apt-get install nfs-server nfs-utils -y
 chmod 777 /opt/data
@@ -584,14 +594,15 @@ apt-get update && apt-get install nfs-utils nfs-client -y
 mkdir /mnt/nfs
 chmod 777 /mnt/nfs
 vim /etc/fstab
-	192.168.32.2:/opt/data /mnt/nfs nfs defaults, netdev 0 0
+	192.168.32.2:/opt/data /mnt/nfs nfs defaults,_netdev 0 0
 mount -av
 df -h
 
 
 **SRV2-COD**
 apt-get update && apt-get install zabbix-server-pgsql -y
-su - postgres -s /bin/sh -c 'createuser --no-superuser --no-createdb --no-createrol --encrypted --pwprompt zabbix_user'
+su - postgres -s /bin/sh -c 'createuser --no-superuser --no-createdb --no-createrole --encrypted --pwprompt zabbix_user'
+Пароль:P@ssw0rdZabbix (user - zabbix_user)
 su - postgres -s /bin/sh -c 'createdb -O zabbix_user zabbix'
 systemctl restart postgresql
 su - postgres -s /bin/sh -c 'psql -U zabbix_user -f /usr/share/doc/zabbix-common-database-pgsql-* /schema.sql zabbix
@@ -617,11 +628,29 @@ vim /etc/zabbix/zabbix_server.conf
 	DBPassword=P@ssw0rdZabbix
 systemctl enable --now zabbix_pgsql
 apt-get install zabbix-phpfrontend-{apache2,php8.2} -y
-vim /etc/httpd/conf/sites-available/zabbix.conf
-	![[Pasted image 20260206221812.png]]
+vim /etc/httpd2/conf/sites-available/zabbix.conf
+<IfModule mod_ssl.c>
+	<VirtualHost *:443>
+		DocumentRoot /var/www/webapps/zabbix/ui
+		ServerName srv1-cod.cod.ssa2026.region
+		ServerAlias monitoring.cod.ssa2026.region
+
+		<Directory /var/www/webapps/zabbix/ui>
+			Options Indexes FollowSymlinks
+			AllowOverride All
+			Reuire all granted
+		</Directory>
+	</VirtualHost>
+</IfModule>
+<VirtualHost *:80>
+	ServerName srv1-cod.cod.ssa2026.region
+	ServerAlias monitoring.cod.ssa2026.region
+	Redirect permanent / https://srv1-cod.cod.ssa2026.region/
+</VirtualHost>
+
 cp /var/ca/newcerts/monitoring.crt /var/lib/ssl/certs/
 cp /var/ca/newcerts/monitoring.key /var/lib/ssl/private/
-ln -s /etc/httpd/conf/sited-available/zabbix.conf /etc/httpd/conf/sites-enabled/
+ln -s /etc/httpd2/conf/sited-available/zabbix.conf /etc/httpd2/conf/sites-enabled/
 a2enmod ssl; a2enmod rewrite; a2enport https
 apachectl -t
 chow -R apache2:apache2 /var/www/webapps/zabbix
@@ -629,13 +658,11 @@ systemctl restart httpd2
 
 **ADMIN-COD**
 https://srv1-cod.cod.ssa2026.region
-![[Pasted image 20260206225820.png]]
-![[Pasted image 20260206225848.png]]
-![[Pasted image 20260206230002.png]]
-![[Pasted image 20260206230127.png]]
+Next step -> next step -> Databasy type: Postgresql host: srv2-cod.cod.ssa2026.region  name: zabbix user: zabbix_user password:P@ssw0rdZabbix -> finish
 Admin - zabbix
-Users-Authentication
-![[Pasted image 20260206230232.png]]
+Users-Authentication-Avoid - убрать галочку
+Сменить пароль Admin через users-users
+
 
 **srv1-cod, srv2-cod, dc-a, sw1-cod, sw2-cod, sw1-a, sw2-a**
 apt-get install zabbix-agent -y
@@ -647,8 +674,7 @@ systemctl enable --now zabbix_agentd
 
 **Веб.интерфейс**
 Мониторинг-zabbix-агент-Прием запросов от Zabbix
-	![[Pasted image 20260206233329.png]]
-
+	Zabbix agent -> 10050 -> 192.168.32.2
 **RTR**
 en
 	conf
