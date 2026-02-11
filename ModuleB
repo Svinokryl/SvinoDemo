@@ -691,3 +691,22 @@ Monitoring -> Hosts ->Create host
 	![[Pasted image 20260206235750.png]]
 
 
+SIP:
+vim /etc/sysconfig/network-scripts/ifcfg-eth0
+	DEVICE=eth0
+	BOOTPOTO=yes
+	ONBOOT=yes
+	IPADDR=192.168.32.34
+	NETMASK	
+	GATEWAY=192.168.32.33
+	DNS=192.168.32.2
+service network restart
+
+Создаем юзера - abort
+переходим в Settings -> Advanced Settings:
+ищем параметр SIP Channel Driver и выбираем chan_sip и нажимаем Submit
+переходим в Settings -> Asterisk SIP Settings:
+ищем параметр Bind Port и меняем с 5160 на 5060 и нажимаем Submit
+apply config
+Переходим в Applications -> Extensions:
+apt=get install linphone
