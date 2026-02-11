@@ -1,0 +1,34 @@
+sudo apt-get update && sudo apt-get install -y wget unzip
+wget https://hashicorp-releases.mcs.mail.ru/terraform/1.14.0/terraform_1.14.0_linux_amd64.zip
+sudo unzip  terraform_1.14.0_linux_amd64.zip -d /usr/local/bin/
+sudo apt-get install -y python3-module-openstackclient python3-module-pipvim
+pip3 install ansible
+export PATH=/home/altlinux/.local/bin:$PATH
+mkdir -p /home/altlinux/Projects/Project_01
+mkdir /home/altlinux/Projects/Project_01/terraform
+cd /home/altlinux/Projects/
+vim cloudinit.conf
+export OS_AUTH_URL=https://172.21.10.79:5000/v3
+export OS_IDENTITY_API_VERSION=3
+export OS_AUTH_TYPE=password
+export OS_PROJECT_DOMAIN_NAME=ModuleG
+export OS_USER_DOMAIN_NAME=ModuleG
+export OS_PROJECT_NAME=Competitror_prjct_04
+export OS_USERNAME=Competitor_04
+export OS_PASSWORD=Password4
+
+source cloudinit.conf
+openstack --insecure server list:
+openstack --insecure network list:
+.terraformrc
+
+  provider_installation {
+    network_mirror {
+        url = "https://terraform-mirror.mcs.mail.ru"
+        include = ["registry.terraform.io/*/*"]
+    }
+    direct {
+        exclude = ["registry.terraform.io/*/*"]
+
+
+    }
